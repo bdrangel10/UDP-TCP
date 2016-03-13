@@ -35,11 +35,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     final static char SEPARADOR = ',';
     final static String nada = "000";
 
+    public boolean cerrarSocket;
+
     long horaInicio;
     long horaFinal;
 
     int cantidadEnviado;
     int cantidadErrores;
+    int cantidadPosiciones;
 
     boolean enviandoUDP;
     boolean enviandoTCP;
@@ -133,18 +136,30 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
+    public boolean seguirLeyendo()
+    {
+        if(cerrarSocket)
+        {
+            return mensajes.size()!=0;
+        }
+        else
+        {
+            return true;
+        }
+    }
+
 
     public void iniciarEnvioUDP(String ip, int puerto)
     {
+        cerrarSocket=false;
         horaInicio=System.currentTimeMillis();
         inicializarEscucha();
         iniciarGPS();
         cantidadEnviado=0;
         cantidadErrores=0;
         enviandoUDP=true;
-        UdpTraffic udp = new UdpTraffic(ip,puerto,this);
-        udpTraffic=udp;
-        threadUDP=new Thread(udp);
+        udpTraffic= new UdpTraffic(ip,puerto,this);
+        threadUDP=new Thread(udpTraffic);
         threadUDP.start();
     }
 
@@ -154,14 +169,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         {
             try
             {
+                cerrarSocket=true;
                 horaFinal=System.currentTimeMillis();
                 enviandoUDP=false;
-                threadUDP.stop();
-                udpTraffic.cerrarConexion();
                 detenerGPS();
+                DesactivarEscuchaGPS();
             }
             catch( Exception e)
             {
+                System.out.println("ERROR:"+e.getMessage());
                 e.printStackTrace();
             }
         }
@@ -169,6 +185,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public void iniciarEnvioTCP(String ip, int puerto)
     {
+        cerrarSocket=false;
         horaInicio=System.currentTimeMillis();
         inicializarEscucha();
         iniciarGPS();
@@ -183,18 +200,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public void detenerEnvioTCD()
     {
-        if(enviandoUDP)
+        if(enviandoTCP)
         {
             try
             {
+                cerrarSocket=true;
                 horaFinal=System.currentTimeMillis();
                 enviandoUDP=false;
-                threadTCP.stop();
-                tcpTraffic.cerrarConexion();
                 detenerGPS();
+                DesactivarEscuchaGPS();
             }
             catch(Exception e)
             {
+                System.out.println("ERROR:"+e.getMessage());
                 e.printStackTrace();
             }
 
@@ -207,14 +225,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     public void detenerGPS() {
-        threadGPS.stop();
+        locListener.detener=true;
     }
 
 
     public void anotarCoordenada(Location ubicacion, long hora)
     {
-        cantidadEnviado++;
-        Location coordenadas = ubicacion!=null?ubicacion:locManager.getLastKnownLocation(locManager.getAllProviders().get(0));
+        cantidadPosiciones++;
+        System.out.println("Localizacion null:"+(ubicacion==null));
+        //Location coordenadas = ubicacion!=null?ubicacion:locManager.getLastKnownLocation(locManager.getAllProviders().get(0));
+        Location coordenadas=ubicacion;
         double latitud;
         double longitud;
         float velocidad;

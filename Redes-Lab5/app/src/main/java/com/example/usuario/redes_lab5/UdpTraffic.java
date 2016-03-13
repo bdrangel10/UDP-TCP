@@ -13,6 +13,7 @@ public class UdpTraffic implements Runnable
     private int puerto;
     private MainActivity principal;
     DatagramSocket socketUDP;
+    public boolean detener;
 
     public UdpTraffic(String ip, int puerto, MainActivity pal)
     {
@@ -22,9 +23,11 @@ public class UdpTraffic implements Runnable
         try
         {
             socketUDP= new DatagramSocket();
+            System.out.println("Socket UDP creado con éxito");
         }
         catch(Exception e)
         {
+            System.out.println("Socket UPD: No creado-"+e.getMessage());
             e.printStackTrace();
         }
     }
@@ -39,6 +42,7 @@ public class UdpTraffic implements Runnable
 
             // Enviamos el datagrama
             socketUDP.send(peticion);
+            principal.cantidadEnviado++;
             System.out.println("UDP-Envío:"+mensaje);
             // Construimos el DatagramPacket que contendrá la respuesta
             byte[] bufer = new byte[1000];
@@ -46,7 +50,7 @@ public class UdpTraffic implements Runnable
             socketUDP.receive(respuesta);
             String rta = new String(respuesta.getData());
             System.out.println("UDP-Rta:"+rta);
-            if(!rta.equals("200 OK"));
+            if(!rta.contains("200 OK"));
             {
                 // Se produjo un error, informar a la principal
                 principal.cantidadErrores++;
@@ -54,6 +58,8 @@ public class UdpTraffic implements Runnable
         }
         catch(Exception e)
         {
+            principal.cantidadErrores++;
+            System.out.println("Socket UDP: Error al enviar o recibir un mensaje-"+e.getMessage());
             e.printStackTrace();
         }
     }
@@ -63,9 +69,11 @@ public class UdpTraffic implements Runnable
         try
         {
             socketUDP.close();
+            System.out.println("Socket UDP cerrado");
         }
         catch(Exception e)
         {
+            System.out.println("ERROR CERRANDO EL SOCKET");
             e.printStackTrace();
         }
     }
@@ -73,22 +81,20 @@ public class UdpTraffic implements Runnable
     @Override
     public void run()
     {
-        while(true)
+        detener=false;
+        while(principal.seguirLeyendo())
         {
             String mensaje = principal.leerMensaje();
             if(mensaje!=null)
             {
                 enviarMensaje(mensaje);
+                System.out.println("Socket UDP: Mensaje Enviado");
+
             }
-            try
-            {
-                Thread.sleep(200);
-            }
-            catch(Exception e)
-            {
-                e.printStackTrace();
-            }
+
         }
+
+        cerrarConexion();
 
     }
 }
