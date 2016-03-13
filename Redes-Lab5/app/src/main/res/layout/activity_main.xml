@@ -26,7 +26,7 @@
             android:layout_gravity="center_horizontal|top"
             android:textStyle="bold"
             android:inputType="number|text"
-            android:text="IP:"
+            android:text="192.168.40.254"
             android:layout_marginLeft="0dp"
             android:layout_row="0"
             android:layout_column="0" />
@@ -42,7 +42,7 @@
             android:layout_marginBottom="360dp"
             android:layout_row="1"
             android:layout_column="0"
-            android:text="Puerto:"
+            android:text="12000"
             android:textStyle="bold"
             android:layout_alignEnd="@+id/gridLayout" />
 

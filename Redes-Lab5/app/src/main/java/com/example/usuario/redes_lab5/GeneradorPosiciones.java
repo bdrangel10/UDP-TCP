@@ -27,9 +27,10 @@ public class GeneradorPosiciones implements Runnable, LocationListener
         while(estado)
         {
             principal.anotarCoordenada(coordenadas, System.currentTimeMillis());
+            System.out.println("COORDENADA NULL:"+coordenadas==null);
             try
             {
-                wait(1000);
+                Thread.sleep(1000);
             }
             catch(Exception e)
             {

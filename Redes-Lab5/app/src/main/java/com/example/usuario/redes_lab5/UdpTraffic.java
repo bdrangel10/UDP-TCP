@@ -82,7 +82,7 @@ public class UdpTraffic implements Runnable
             }
             try
             {
-                wait(200);
+                Thread.sleep(200);
             }
             catch(Exception e)
             {

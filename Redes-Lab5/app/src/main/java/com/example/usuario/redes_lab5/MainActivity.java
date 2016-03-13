@@ -8,6 +8,7 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
@@ -20,6 +21,8 @@ import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener, CompoundButton.OnCheckedChangeListener
 {
+
+    static final int SOLICITUD_GPS=123;
 
     LocationManager locManager;
     GeneradorPosiciones locListener;
@@ -82,9 +85,52 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         System.out.println("Creado el trhead GPS");
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
         {
-            System.out.println("No se tienen los permisos");
+                System.out.println("No se tienen los permisos");
+
+
+                    // Should we show an explanation?
+                    if (ActivityCompat.shouldShowRequestPermissionRationale(this,Manifest.permission.ACCESS_FINE_LOCATION))
+                    {
+
+                        // Show an expanation to the user *asynchronously* -- don't block
+                        // this thread waiting for the user's response! After the user
+                        // sees the explanation, try again to request the permission.
+
+                    }
+                    else
+                    {
+
+                        // No explanation needed, we can request the permission.
+                        ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.ACCESS_FINE_LOCATION},SOLICITUD_GPS);
+                    }
+                }
+
+    }
+
+    public void onRequestPermissionsResult(int requestCode,String permissions[], int[] grantResults)
+    {
+        switch (requestCode) {
+            case SOLICITUD_GPS: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED)
+                {
+
+                    // permission was granted, yay! Do the
+                    // contacts-related task you need to do.
+                    locManager.requestLocationUpdates(locManager.GPS_PROVIDER, 0, 0, locListener);
+
+                } else {
+
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+                }
+                return;
+            }
+
+            // other 'case' lines to check for other
+            // permissions this app might request
         }
-        locManager.requestLocationUpdates(locManager.GPS_PROVIDER, 0, 0, locListener);
     }
 
 
@@ -99,7 +145,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         UdpTraffic udp = new UdpTraffic(ip,puerto,this);
         udpTraffic=udp;
         threadUDP=new Thread(udp);
-        threadGPS.start();
         threadUDP.start();
     }
 
@@ -111,7 +156,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             {
                 horaFinal=System.currentTimeMillis();
                 enviandoUDP=false;
-                threadGPS.stop();
                 threadUDP.stop();
                 udpTraffic.cerrarConexion();
                 detenerGPS();
@@ -134,7 +178,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         TcpTraffic tcp = new TcpTraffic(ip,puerto,this);
         tcpTraffic=tcp;
         threadTCP=new Thread(tcp);
-        threadGPS.start();
         threadTCP.start();
     }
 
@@ -146,7 +189,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             {
                 horaFinal=System.currentTimeMillis();
                 enviandoUDP=false;
-                threadGPS.stop();
                 threadTCP.stop();
                 tcpTraffic.cerrarConexion();
                 detenerGPS();
