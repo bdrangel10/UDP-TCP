@@ -23,19 +23,11 @@ public class DetenerPruebas  implements Runnable
        try
        {
            Thread.sleep(tiempo);
-           principal.cerrarSocket=true;
-           if(tipo_prueba==UDP)
-           {
-               principal.enviandoUDP=false;
-           }
-           else
-           {
-               principal.enviandoTCP=false;
-           }
+           principal.probando=false;
        }
        catch(Exception e)
        {
-           principal.cerrarSocket=true;
+           principal.probando=false;
            System.out.println("Prueba Forzada a terminar");
        }
 

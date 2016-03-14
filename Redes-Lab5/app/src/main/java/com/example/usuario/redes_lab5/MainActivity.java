@@ -32,6 +32,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Thread threadGPS;
     Thread threadUDP;
     Thread threadTCP;
+
     final static char SEPARADOR = ',';
     final static String nada = "000";
 
@@ -46,6 +47,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     boolean enviandoUDP;
     boolean enviandoTCP;
+
+    boolean probando;
 
     ArrayList<String> mensajes;
 
@@ -64,6 +67,24 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Button btnt100;
     Button btnt200;
     Button btnt300;
+
+    public String darUbicacionActual()
+    {
+        cantidadPosiciones++;
+        Location coordenadas=locListener.darUbicacion();
+        double latitud;
+        double longitud;
+        float velocidad;
+        long hora =System.currentTimeMillis();
+        String mensaje = "" + hora + SEPARADOR + nada + SEPARADOR + nada + SEPARADOR + nada + SEPARADOR + nada;
+        if (coordenadas != null) {
+            latitud = coordenadas.getLatitude();
+            longitud = coordenadas.getLongitude();
+            velocidad = coordenadas.getSpeed();
+            mensaje = "" + hora + SEPARADOR + latitud + SEPARADOR + longitud + SEPARADOR + coordenadas.getAltitude() + SEPARADOR + velocidad;
+        }
+        return mensaje;
+    }
 
 
     @Override
@@ -97,6 +118,27 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         traficoUDP.setOnClickListener(this);
         traficoUDP.setOnCheckedChangeListener(this);
         System.out.println("Constructor completado con éxito");
+    }
+
+    public void inicializarGeneradorPosiciones()
+    {
+        locManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        locListener = new GeneradorPosiciones(this);
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+        {
+            System.out.println("No se tienen los permisos");
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this,Manifest.permission.ACCESS_FINE_LOCATION))
+            {    // Show an expanation to the user *asynchronously* -- don't block
+                // this thread waiting for the user's response! After the user
+                // sees the explanation, try again to request the permission.
+            }
+            else
+            {
+                // No explanation needed, we can request the permission.
+                ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.ACCESS_FINE_LOCATION},SOLICITUD_GPS);
+            }
+        }
+
     }
 
     public void inicializarEscucha()
@@ -174,9 +216,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         cerrarSocket=false;
         horaInicio=System.currentTimeMillis();
         inicializarEscucha();
-        iniciarGPS();
         cantidadEnviado=0;
         cantidadErrores=0;
+        cantidadPosiciones=0;
         enviandoUDP=true;
         udpTraffic= new UdpTraffic(ip,puerto,this);
         threadUDP=new Thread(udpTraffic);
@@ -185,13 +227,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public void iniciarEscenarioUDP(int n, int segundos)
     {
-        cerrarSocket=false;
+        probando=true;
+        cantidadEnviado=0;
+        cantidadErrores=0;
+        cantidadPosiciones=0;
         inicializarEscucha();
-        iniciarGPS();
-        enviandoUDP=true;
         for(int i =0; i<n;i++)
         {
-            UdpTraffic socketUDP= new UdpTraffic(direccionIP,puerto,this);
+            UdpTrafficTest socketUDP= new UdpTrafficTest(direccionIP,puerto,this);
             Thread threadUDP_test=new Thread(socketUDP);
             threadUDP_test.start();
         }
@@ -202,13 +245,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public void iniciarEscenarioTCP(int n, int segundos)
     {
-        cerrarSocket=false;
+        probando=true;
+        cantidadEnviado=0;
+        cantidadErrores=0;
+        cantidadPosiciones=0;
         inicializarEscucha();
-        iniciarGPS();
-        enviandoTCP=true;
         for(int i =0; i<n;i++)
         {
-            TcpTraffic socketTCP= new TcpTraffic(direccionIP,puerto,this);
+            TcpTrafficTest socketTCP= new TcpTrafficTest(direccionIP,puerto,this);
             Thread threadTCP_test=new Thread(socketTCP);
             threadTCP_test.start();
         }
