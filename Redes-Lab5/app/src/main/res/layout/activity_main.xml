@@ -105,4 +105,58 @@
         android:clickable="false"
         android:capitalize="words" />
 
+    <Button
+        style="?android:attr/buttonStyleSmall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="U 100"
+        android:id="@+id/u_100"
+        android:layout_below="@+id/btnTCP" />
+
+    <Button
+        style="?android:attr/buttonStyleSmall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="90dp"
+        android:text="U 200"
+        android:id="@+id/u_200"
+        android:layout_below="@+id/btnTCP" />
+    <Button
+        style="?android:attr/buttonStyleSmall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="180dp"
+        android:text="U 300"
+        android:id="@+id/u_300"
+        android:layout_below="@+id/btnTCP" />
+
+    <Button
+        style="?android:attr/buttonStyleSmall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="60dp"
+        android:text="T 100"
+        android:id="@+id/t_100"
+        android:layout_below="@+id/btnTCP" />
+
+    <Button
+        style="?android:attr/buttonStyleSmall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="180dp"
+        android:layout_marginTop="60dp"
+        android:text="T 300"
+        android:id="@+id/t_300"
+        android:layout_below="@+id/btnTCP" />
+
+    <Button
+        style="?android:attr/buttonStyleSmall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="90dp"
+        android:layout_marginTop="60dp"
+        android:text="T 200"
+        android:id="@+id/t_200"
+        android:layout_below="@+id/btnTCP" />
+
 </RelativeLayout>

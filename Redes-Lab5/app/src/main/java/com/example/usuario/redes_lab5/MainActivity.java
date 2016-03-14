@@ -58,6 +58,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     EditText txtPuerto;
     Switch traficoUDP;
     Switch traficoTCP;
+    Button btnu100;
+    Button btnu200;
+    Button btnu300;
+    Button btnt100;
+    Button btnt200;
+    Button btnt300;
 
 
     @Override
@@ -67,6 +73,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         btnOk = (Button)findViewById(R.id.btnOK);
         btnOk.setOnClickListener(this);
+
+        btnu100=(Button)findViewById(R.id.u_100);
+        btnu200=(Button)findViewById(R.id.u_200);
+        btnu300=(Button)findViewById(R.id.u_300);
+        btnt300=(Button)findViewById(R.id.t_300);
+        btnt200=(Button)findViewById(R.id.t_200);
+        btnt100=(Button)findViewById(R.id.t_100);
+        btnu100.setOnClickListener(this);
+        btnu100.setOnClickListener(this);
+        btnu200.setOnClickListener(this);
+        btnu300.setOnClickListener(this);
+        btnt100.setOnClickListener(this);
+        btnt200.setOnClickListener(this);
+        btnt300.setOnClickListener(this);
 
         txtIP =(EditText)findViewById(R.id.txtIP);
         txtPuerto=(EditText)findViewById(R.id.txtPuerto);
@@ -163,6 +183,39 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         threadUDP.start();
     }
 
+    public void iniciarEscenarioUDP(int n, int segundos)
+    {
+        cerrarSocket=false;
+        inicializarEscucha();
+        iniciarGPS();
+        enviandoUDP=true;
+        for(int i =0; i<n;i++)
+        {
+            UdpTraffic socketUDP= new UdpTraffic(direccionIP,puerto,this);
+            Thread threadUDP_test=new Thread(socketUDP);
+            threadUDP_test.start();
+        }
+        DetenerPruebas detener= new DetenerPruebas(segundos*1000,DetenerPruebas.UDP,this);
+        new Thread(detener).start();
+
+    }
+
+    public void iniciarEscenarioTCP(int n, int segundos)
+    {
+        cerrarSocket=false;
+        inicializarEscucha();
+        iniciarGPS();
+        enviandoTCP=true;
+        for(int i =0; i<n;i++)
+        {
+            TcpTraffic socketTCP= new TcpTraffic(direccionIP,puerto,this);
+            Thread threadTCP_test=new Thread(socketTCP);
+            threadTCP_test.start();
+        }
+        DetenerPruebas detener= new DetenerPruebas(segundos*1000,DetenerPruebas.TCP,this);
+        new Thread(detener).start();
+    }
+
     public void detenerEnvioUPD()
     {
         if(enviandoUDP)
@@ -172,8 +225,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 cerrarSocket=true;
                 horaFinal=System.currentTimeMillis();
                 enviandoUDP=false;
-                detenerGPS();
-                DesactivarEscuchaGPS();
             }
             catch( Exception e)
             {
@@ -185,16 +236,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public void iniciarEnvioTCP(String ip, int puerto)
     {
+
         cerrarSocket=false;
         horaInicio=System.currentTimeMillis();
         inicializarEscucha();
         iniciarGPS();
         cantidadEnviado=0;
         cantidadErrores=0;
+        cantidadPosiciones=0;
         enviandoTCP=true;
-        TcpTraffic tcp = new TcpTraffic(ip,puerto,this);
-        tcpTraffic=tcp;
-        threadTCP=new Thread(tcp);
+        tcpTraffic=new TcpTraffic(ip,puerto,this);
+        threadTCP=new Thread(tcpTraffic);
         threadTCP.start();
     }
 
@@ -207,8 +259,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 cerrarSocket=true;
                 horaFinal=System.currentTimeMillis();
                 enviandoUDP=false;
-                detenerGPS();
-                DesactivarEscuchaGPS();
             }
             catch(Exception e)
             {
@@ -232,7 +282,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public void anotarCoordenada(Location ubicacion, long hora)
     {
         cantidadPosiciones++;
-        System.out.println("Localizacion null:"+(ubicacion==null));
         //Location coordenadas = ubicacion!=null?ubicacion:locManager.getLastKnownLocation(locManager.getAllProviders().get(0));
         Location coordenadas=ubicacion;
         double latitud;
@@ -286,6 +335,51 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             alertDialog.setTitle("Red ok");
             alertDialog.setMessage("Se han establecido con éxito los parámetros de la conexión");
             alertDialog.show();
+
+        }
+        else
+        {
+            int cant=0;
+            String tit="Prueba de concurrencia ";
+            if(v==btnu100)
+            {
+                tit+="UDP";
+                cant=100;
+                iniciarEscenarioUDP(cant,60);
+            }
+            else if (v==btnu200)
+            {
+                tit+="UDP";
+                cant=200;
+                iniciarEscenarioUDP(cant,60);
+            }
+            else if(v==btnu300)
+            {
+                tit+="UDP";
+                cant=300;
+                iniciarEscenarioUDP(cant,60);
+            }
+            else if(v==btnt100)
+            {
+                tit+="TCP";
+                cant=100;
+                iniciarEscenarioTCP(cant, 60);
+            }
+            else if(v==btnt200)
+            {
+                tit+="TCP";
+                cant=200;
+                iniciarEscenarioTCP(cant, 60);
+            }
+            else if(v==btnt300)
+            {
+                tit+="TCP";
+                cant=300;
+                iniciarEscenarioTCP(cant,60);
+            }
+            alertDialog.setTitle("Prueba de Concurrencia");
+            alertDialog.setMessage("Se está lanzando el pool de Threads con los hilos específicados: "+cant);
+            alertDialog.show();
         }
 
     }
@@ -324,9 +418,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             {
                 detenerEnvioUPD();
                 double tiempo = (horaFinal-horaInicio)/1000;
-                int total=(cantidadEnviado+cantidadErrores);
+                int total=(cantidadPosiciones);
                 double porc = total!=0?cantidadErrores*100/total:0;
-                String msj="Envío de datos protocolo UDP \nEnviados:"+cantidadEnviado+"\nErrores:"+cantidadErrores+"\nTotal:"+total+"\nTiempo:"+tiempo+"s\n%Error:"+porc;
+                String msj="Envío de datos protocolo UDP \nIntentados:"+cantidadPosiciones+"\nEnviados:"+cantidadEnviado+"\nErrores:"+cantidadErrores+"\nTotal:"+total+"\nTiempo:"+tiempo+"s\n%Error:"+porc;
                 alertDialog.setTitle("Estadísticas");
                 alertDialog.setMessage(msj);
                 alertDialog.show();
