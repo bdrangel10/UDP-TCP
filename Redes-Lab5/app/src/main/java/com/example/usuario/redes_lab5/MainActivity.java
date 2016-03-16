@@ -2,13 +2,10 @@ package com.example.usuario.redes_lab5;
 
 import android.Manifest;
 import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.location.Location;
-import android.location.LocationListener;
 import android.location.LocationManager;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
@@ -17,48 +14,49 @@ import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.Switch;
 
-import java.util.ArrayList;
+import com.example.usuario.redes_lab5.TraficoTCP.SocketTCP;
+import com.example.usuario.redes_lab5.TraficoTCP.SocketTCPEscenario;
+import com.example.usuario.redes_lab5.TraficoTCP.ThreadGeneradorTraficoTCP;
+import com.example.usuario.redes_lab5.TraficoUDP.SocketUDP;
+import com.example.usuario.redes_lab5.TraficoUDP.ThreadGeneradorTraficoUDP;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener, CompoundButton.OnCheckedChangeListener
 {
-
-    static final int SOLICITUD_GPS=123;
-
+    //USADOS
+    public boolean socketTCPCreado;
+    public boolean probando;
+    private ThreadGeneradorTraficoUDP generadorTraficoUDP;
+    private ThreadGeneradorTraficoTCP generadorTraficoTCP;
     LocationManager locManager;
     GeneradorPosiciones locListener;
 
-    UdpTraffic udpTraffic;
-    TcpTraffic tcpTraffic;
-    Thread threadGPS;
-    Thread threadUDP;
-    Thread threadTCP;
+    String direccionIP="192.168.40.254";
+    int puerto=12000;
+
+
+    //ESTADISTICAS
+    long horaInicio;
+    long horaFinal;
+    public int intentos;
+    public int enviados_OK;
+    public int enviados_error;
+    public int respuestas_OK;
+    public int respuestas_error;
 
     final static char SEPARADOR = ',';
     final static String nada = "000";
+    int tiempo_defecto_envío=1000;
+    int tiempo_duracion_prueba_sec=60;
 
-    public boolean cerrarSocket;
-
-    long horaInicio;
-    long horaFinal;
-
-    int cantidadEnviado;
-    int cantidadErrores;
-    int cantidadPosiciones;
-
-    boolean enviandoUDP;
-    boolean enviandoTCP;
-
-    boolean probando;
-
-    ArrayList<String> mensajes;
-
-    String direccionIP;
-    int puerto;
+    static final int SOLICITUD_GPS=123;
 
     //Componentes gráficos
     Button btnOk;
     EditText txtIP;
     EditText txtPuerto;
+    EditText txtHilos;
+    EditText txtTotalPrueba;
+    EditText txtPerEnvio;
     Switch traficoUDP;
     Switch traficoTCP;
     Button btnu100;
@@ -67,10 +65,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Button btnt100;
     Button btnt200;
     Button btnt300;
+    Button btnTCP;
+    Button btnUDP;
 
     public String darUbicacionActual()
     {
-        cantidadPosiciones++;
+        intentos++;
         Location coordenadas=locListener.darUbicacion();
         double latitud;
         double longitud;
@@ -86,39 +86,282 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         return mensaje;
     }
 
+    public void generarTraficoUDP_continuo()
+    {
+        inicializarGeneradorPosiciones();
+        horaInicio=System.currentTimeMillis();
+        reiniciarEstadisticas();
+        SocketUDP socket = new SocketUDP(direccionIP,puerto,this);
+        generadorTraficoUDP=new ThreadGeneradorTraficoUDP(socket,this);
+        generadorTraficoUDP.start();
+        System.out.println("TRAFICO UDP INICIADO...");
+    }
+
+    public void detenerTraficoUDP_continuo()
+    {
+        horaFinal=System.currentTimeMillis();
+        generadorTraficoUDP.detenerTrafico();
+        desactivarEscuchaGPS();
+    }
+
+    public void generarTraficoTCP_continuo()
+    {
+        socketTCPCreado =false;
+        inicializarGeneradorPosiciones();
+        horaInicio=System.currentTimeMillis();
+        reiniciarEstadisticas();
+        //Crea el socket TCP en un hilo de ejecución diferente
+        SocketTCP socket = new SocketTCP(direccionIP,puerto,this);
+        socket.start();
+        int i=0;
+        while (socketTCPCreado ==false && i<20)
+        {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            i++;
+        }
+        if(i<20)
+        {
+            generadorTraficoTCP=new ThreadGeneradorTraficoTCP(socket,this);
+            generadorTraficoTCP.start();
+            System.out.println("TRAFICO TCP INICIADO...");
+        }
+        else
+        {
+            AlertDialog alertDialog = new AlertDialog.Builder(this).create();
+            traficoTCP.setChecked(false);
+            alertDialog.setTitle("Error TCP");
+            alertDialog.setMessage("No se ha podido crear el Socket TCP. Verifique que el servidor se encuentra activo en el puerto " + puerto);
+            alertDialog.show();
+
+        }
+    }
+
+    public void detenerTraficoTCP_continuo()
+    {
+        horaFinal=System.currentTimeMillis();
+        generadorTraficoTCP.detenerTrafico();
+        desactivarEscuchaGPS();
+    }
+
+
+    public void iniciarEscenarioUDP(int n, int segundos, int envio_datos)
+    {
+        probando=true;
+        reiniciarEstadisticas();
+        inicializarGeneradorPosiciones();
+        horaInicio=System.currentTimeMillis();
+        for(int i =0; i<n;i++)
+        {
+            SocketUDP socket = new SocketUDP(direccionIP,puerto,this);
+            socket.cambiarPeriodoEnvio(envio_datos);
+            socket.start();
+        }
+        DetenerPruebas detener= new DetenerPruebas(segundos*1000,DetenerPruebas.UDP,this);
+        new Thread(detener).start();
+
+    }
+
+
+    public void iniciarEscenarioTCP(int n, int segundos, int envio_datos)
+    {
+        inicializarGeneradorPosiciones();
+        horaInicio=System.currentTimeMillis();
+        reiniciarEstadisticas();
+        System.out.println("Escenario TCP: Lanzando threads");
+        probando=true;
+        for(int i =0; i<n;i++)
+        {
+            //Crea el socket TCP en un hilo de ejecución diferente
+            SocketTCPEscenario socketActual = new SocketTCPEscenario(direccionIP,puerto,this,i,envio_datos);
+            socketActual.start();
+        }
+        DetenerPruebas detener= new DetenerPruebas(segundos*1000,DetenerPruebas.TCP,this);
+        new Thread(detener).start();
+    }
+
+
+
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+    public void onClick(View v)
+    {
+        AlertDialog alertDialog = new AlertDialog.Builder(this).create();
+        int cant=0;
+        String tit="Prueba de concurrencia TCP";
+        boolean UDP=false;
+        boolean ok=false;
+        boolean personalizada=false;
+        if(v==btnOk)
+        {
+            ok=true;
+            direccionIP=(txtIP.getText()).toString();
+            puerto=Integer.parseInt(txtPuerto.getText().toString());
+            alertDialog.setTitle("Red ok");
+            alertDialog.setMessage("Se han establecido con éxito los parámetros de la conexión");
+            alertDialog.show();
 
-        btnOk = (Button)findViewById(R.id.btnOK);
-        btnOk.setOnClickListener(this);
+        }
+        else if(v==btnu100)
+        {
+            UDP=true;
+            cant=100;
+        }
+        else if(v==btnu200)
+        {
+            UDP=true;
+            cant=200;
+        }
+        else if(v==btnu300)
+        {
+            UDP=true;
+            cant=300;
+        }
 
-        btnu100=(Button)findViewById(R.id.u_100);
-        btnu200=(Button)findViewById(R.id.u_200);
-        btnu300=(Button)findViewById(R.id.u_300);
-        btnt300=(Button)findViewById(R.id.t_300);
-        btnt200=(Button)findViewById(R.id.t_200);
-        btnt100=(Button)findViewById(R.id.t_100);
-        btnu100.setOnClickListener(this);
-        btnu100.setOnClickListener(this);
-        btnu200.setOnClickListener(this);
-        btnu300.setOnClickListener(this);
-        btnt100.setOnClickListener(this);
-        btnt200.setOnClickListener(this);
-        btnt300.setOnClickListener(this);
+        else if(v==btnt100)
+        {
+            cant=100;
+            UDP=false;
+        }
+        else if(v==btnt200)
+        {
+            cant=200;
+            UDP=false;
+        }
+        else if(v==btnt300)
+        {
+            cant=300;
+            UDP=false;
+        }
+        else if(v==btnTCP)
+        {
+            UDP=false;
+            personalizada=true;
+        }
+        else if(v==btnUDP)
+        {
+            UDP=true;
+            personalizada=true;
+        }
 
-        txtIP =(EditText)findViewById(R.id.txtIP);
-        txtPuerto=(EditText)findViewById(R.id.txtPuerto);
-        traficoTCP=(Switch)findViewById(R.id.btnTCP);
-        traficoTCP.setOnCheckedChangeListener(this);
-        traficoTCP.setOnClickListener(this);
-        traficoUDP=(Switch)findViewById(R.id.btnUDP);
-        traficoUDP.setOnClickListener(this);
-        traficoUDP.setOnCheckedChangeListener(this);
-        System.out.println("Constructor completado con éxito");
+        if(UDP)
+        {
+            tit="Prueba de concurrencia UDP";
+            if(!personalizada)
+            {
+                iniciarEscenarioUDP(cant,tiempo_duracion_prueba_sec,tiempo_defecto_envío);
+            }
+            else
+            {
+                int hilos=Integer.parseInt(txtHilos.getText().toString());
+                cant=hilos;
+                int tiempo_prueba=Integer.parseInt(txtTotalPrueba.getText().toString());
+                int per_envio=Integer.parseInt(txtPerEnvio.getText().toString());
+                iniciarEscenarioUDP(hilos, tiempo_prueba, per_envio);
+            }
+
+        }
+        else
+        {
+            if(personalizada)
+            {
+                int hilos=Integer.parseInt(txtHilos.getText().toString());
+                cant=hilos;
+                int tiempo_prueba=Integer.parseInt(txtTotalPrueba.getText().toString());
+                int per_envio=Integer.parseInt(txtPerEnvio.getText().toString());
+                iniciarEscenarioTCP(hilos,tiempo_prueba,per_envio);
+            }
+            else
+            {
+                iniciarEscenarioTCP(cant, tiempo_duracion_prueba_sec, tiempo_defecto_envío);
+            }
+
+        }
+        if(!ok)
+        {
+            alertDialog.setTitle(tit);
+            alertDialog.setMessage("Se está lanzando el pool de Threads con los hilos específicados: "+cant);
+            alertDialog.show();
+        }
     }
+
+    @Override
+    public void onCheckedChanged(CompoundButton buttonView, boolean isChecked)
+    {
+        if (buttonView == traficoTCP)
+        {
+            if (isChecked) {
+                generarTraficoTCP_continuo();
+                mostrarMsjInicioFlujoConstante("TCP");
+            } else {
+                detenerTraficoTCP_continuo();
+                mostrarEstadisticasTrafico("TCP");
+            }
+        }
+        else if(buttonView== traficoUDP)
+        {
+            if(isChecked)
+            {
+                generarTraficoUDP_continuo();
+                mostrarMsjInicioFlujoConstante("UDP");
+            }
+            else
+            {
+                detenerTraficoUDP_continuo();
+                mostrarEstadisticasTrafico("UDP");
+            }
+        }
+    }
+
+    //ALERTAS Y ESTADÍSTICAS
+
+    public void mostrarMsjInicioFlujoConstante(String tipoTrafico)
+    {
+        AlertDialog alertDialog = new AlertDialog.Builder(this).create();
+        alertDialog.setTitle("Tráfico "+tipoTrafico);
+        alertDialog.setMessage("Ha iniciado el flujo constante de trafico " + tipoTrafico);
+        alertDialog.show();
+    }
+
+    public void mostrarEstadisticasTrafico(String tipoTrafico)
+    {
+        AlertDialog alertDialog = new AlertDialog.Builder(this).create();
+        horaFinal=System.currentTimeMillis();
+        double tiempo = (horaFinal-horaInicio)/1000;
+
+        double errorEnvio=intentos!=0?enviados_error*100/intentos:0;
+        double errorRta=(respuestas_error+respuestas_OK)!=0?respuestas_error*100/(respuestas_OK+respuestas_error):0;
+        String separador="\n------------------------------";
+        String msj="Envío de datos protocolo "+tipoTrafico+separador+
+                "\nEnviados OK:"+enviados_OK+
+                "\nEnviados Error:"+enviados_error+
+                "\nIntentos Envío:"+ intentos +separador+
+                "\nRespuestas OK:"+respuestas_OK+
+                "\nRespuestas Error:"+respuestas_error+
+                "\nTotal respuestas:"+respuestas_error+respuestas_OK+separador+
+                "\nError de envíos:"+errorEnvio+
+                "\nError de rtas:"+errorRta+separador+
+                "\nTiempo de envío(s):"+tiempo;
+        alertDialog.setTitle("Estadísticas "+tipoTrafico);
+        alertDialog.setMessage(msj);
+        alertDialog.show();
+    }
+
+    public void reiniciarEstadisticas()
+    {
+        enviados_OK=0;
+        enviados_error=0;
+        respuestas_OK=0;
+        respuestas_error=0;
+        intentos=0;
+        horaInicio=System.currentTimeMillis();
+        horaFinal=horaInicio;
+    }
+
+    //MÉTODOS ASOCIADOS A LA INICIALIZACIÓN Y PETICIÓN DEL GPS
 
     public void inicializarGeneradorPosiciones()
     {
@@ -138,38 +381,22 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.ACCESS_FINE_LOCATION},SOLICITUD_GPS);
             }
         }
+        System.out.println("GPS:Activo");
 
     }
 
-    public void inicializarEscucha()
-    {
-        locManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-        mensajes = new ArrayList<String>();
-        locListener = new GeneradorPosiciones(this);
-        threadGPS = new Thread(locListener);
-        System.out.println("Creado el trhead GPS");
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
-        {
-                System.out.println("No se tienen los permisos");
-
-
-                    // Should we show an explanation?
-                    if (ActivityCompat.shouldShowRequestPermissionRationale(this,Manifest.permission.ACCESS_FINE_LOCATION))
-                    {
-
-                        // Show an expanation to the user *asynchronously* -- don't block
-                        // this thread waiting for the user's response! After the user
-                        // sees the explanation, try again to request the permission.
-
-                    }
-                    else
-                    {
-
-                        // No explanation needed, we can request the permission.
-                        ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.ACCESS_FINE_LOCATION},SOLICITUD_GPS);
-                    }
-                }
-
+    public void desactivarEscuchaGPS() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
+        locManager.removeUpdates(locListener);
     }
 
     public void onRequestPermissionsResult(int requestCode,String permissions[], int[] grantResults)
@@ -198,279 +425,45 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    public boolean seguirLeyendo()
-    {
-        if(cerrarSocket)
-        {
-            return mensajes.size()!=0;
-        }
-        else
-        {
-            return true;
-        }
-    }
-
-
-    public void iniciarEnvioUDP(String ip, int puerto)
-    {
-        cerrarSocket=false;
-        horaInicio=System.currentTimeMillis();
-        inicializarEscucha();
-        cantidadEnviado=0;
-        cantidadErrores=0;
-        cantidadPosiciones=0;
-        enviandoUDP=true;
-        udpTraffic= new UdpTraffic(ip,puerto,this);
-        threadUDP=new Thread(udpTraffic);
-        threadUDP.start();
-    }
-
-    public void iniciarEscenarioUDP(int n, int segundos)
-    {
-        probando=true;
-        cantidadEnviado=0;
-        cantidadErrores=0;
-        cantidadPosiciones=0;
-        inicializarEscucha();
-        for(int i =0; i<n;i++)
-        {
-            UdpTrafficTest socketUDP= new UdpTrafficTest(direccionIP,puerto,this);
-            Thread threadUDP_test=new Thread(socketUDP);
-            threadUDP_test.start();
-        }
-        DetenerPruebas detener= new DetenerPruebas(segundos*1000,DetenerPruebas.UDP,this);
-        new Thread(detener).start();
-
-    }
-
-    public void iniciarEscenarioTCP(int n, int segundos)
-    {
-        probando=true;
-        cantidadEnviado=0;
-        cantidadErrores=0;
-        cantidadPosiciones=0;
-        inicializarEscucha();
-        for(int i =0; i<n;i++)
-        {
-            TcpTrafficTest socketTCP= new TcpTrafficTest(direccionIP,puerto,this);
-            Thread threadTCP_test=new Thread(socketTCP);
-            threadTCP_test.start();
-        }
-        DetenerPruebas detener= new DetenerPruebas(segundos*1000,DetenerPruebas.TCP,this);
-        new Thread(detener).start();
-    }
-
-    public void detenerEnvioUPD()
-    {
-        if(enviandoUDP)
-        {
-            try
-            {
-                cerrarSocket=true;
-                horaFinal=System.currentTimeMillis();
-                enviandoUDP=false;
-            }
-            catch( Exception e)
-            {
-                System.out.println("ERROR:"+e.getMessage());
-                e.printStackTrace();
-            }
-        }
-    }
-
-    public void iniciarEnvioTCP(String ip, int puerto)
-    {
-
-        cerrarSocket=false;
-        horaInicio=System.currentTimeMillis();
-        inicializarEscucha();
-        iniciarGPS();
-        cantidadEnviado=0;
-        cantidadErrores=0;
-        cantidadPosiciones=0;
-        enviandoTCP=true;
-        tcpTraffic=new TcpTraffic(ip,puerto,this);
-        threadTCP=new Thread(tcpTraffic);
-        threadTCP.start();
-    }
-
-    public void detenerEnvioTCD()
-    {
-        if(enviandoTCP)
-        {
-            try
-            {
-                cerrarSocket=true;
-                horaFinal=System.currentTimeMillis();
-                enviandoUDP=false;
-            }
-            catch(Exception e)
-            {
-                System.out.println("ERROR:"+e.getMessage());
-                e.printStackTrace();
-            }
-
-        }
-    }
-
-
-    public void iniciarGPS() {
-        threadGPS.start();
-    }
-
-    public void detenerGPS() {
-        locListener.detener=true;
-    }
-
-
-    public void anotarCoordenada(Location ubicacion, long hora)
-    {
-        cantidadPosiciones++;
-        //Location coordenadas = ubicacion!=null?ubicacion:locManager.getLastKnownLocation(locManager.getAllProviders().get(0));
-        Location coordenadas=ubicacion;
-        double latitud;
-        double longitud;
-        float velocidad;
-        String mensaje = "" + hora + SEPARADOR + nada + SEPARADOR + nada + SEPARADOR + nada + SEPARADOR + nada;
-        if (coordenadas != null) {
-            latitud = coordenadas.getLatitude();
-            longitud = coordenadas.getLongitude();
-            velocidad = coordenadas.getSpeed();
-            mensaje = "" + hora + SEPARADOR + latitud + SEPARADOR + longitud + SEPARADOR + ubicacion.getAltitude() + SEPARADOR + velocidad;
-
-        }
-        mensajes.add(mensaje);
-        System.out.println("COLA:"+mensaje);
-    }
-
-    public String leerMensaje() {
-        String mensaje = null;
-        if (mensajes.size() > 0) {
-            mensaje = mensajes.get(0);
-            mensajes.remove(0);
-        }
-        return mensaje;
-    }
-
-    public void DesactivarEscuchaGPS() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
-            return;
-        }
-        locManager.removeUpdates(locListener);
-    }
-
-
-
+    //ONCREATE
     @Override
-    public void onClick(View v)
-    {
-        AlertDialog alertDialog = new AlertDialog.Builder(this).create();
-        if(v==btnOk)
-        {
-            direccionIP=(txtIP.getText()).toString();
-            puerto=Integer.parseInt(txtPuerto.getText().toString());
-            alertDialog.setTitle("Red ok");
-            alertDialog.setMessage("Se han establecido con éxito los parámetros de la conexión");
-            alertDialog.show();
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        btnOk = (Button)findViewById(R.id.btnOK);
+        btnOk.setOnClickListener(this);
 
-        }
-        else
-        {
-            int cant=0;
-            String tit="Prueba de concurrencia ";
-            if(v==btnu100)
-            {
-                tit+="UDP";
-                cant=100;
-                iniciarEscenarioUDP(cant,60);
-            }
-            else if (v==btnu200)
-            {
-                tit+="UDP";
-                cant=200;
-                iniciarEscenarioUDP(cant,60);
-            }
-            else if(v==btnu300)
-            {
-                tit+="UDP";
-                cant=300;
-                iniciarEscenarioUDP(cant,60);
-            }
-            else if(v==btnt100)
-            {
-                tit+="TCP";
-                cant=100;
-                iniciarEscenarioTCP(cant, 60);
-            }
-            else if(v==btnt200)
-            {
-                tit+="TCP";
-                cant=200;
-                iniciarEscenarioTCP(cant, 60);
-            }
-            else if(v==btnt300)
-            {
-                tit+="TCP";
-                cant=300;
-                iniciarEscenarioTCP(cant,60);
-            }
-            alertDialog.setTitle("Prueba de Concurrencia");
-            alertDialog.setMessage("Se está lanzando el pool de Threads con los hilos específicados: "+cant);
-            alertDialog.show();
-        }
+        btnu100=(Button)findViewById(R.id.u_100);
+        btnu200=(Button)findViewById(R.id.u_200);
+        btnu300=(Button)findViewById(R.id.u_300);
+        btnt300=(Button)findViewById(R.id.t_300);
+        btnt200=(Button)findViewById(R.id.t_200);
+        btnt100=(Button)findViewById(R.id.t_100);
+        btnUDP=(Button)findViewById(R.id.udp_test);
+        btnTCP=(Button)findViewById(R.id.tcp_test);
+        btnu100.setOnClickListener(this);
+        btnu200.setOnClickListener(this);
+        btnu300.setOnClickListener(this);
+        btnt100.setOnClickListener(this);
+        btnt200.setOnClickListener(this);
+        btnt300.setOnClickListener(this);
+        btnUDP.setOnClickListener(this);
+        btnTCP.setOnClickListener(this);
 
+        txtHilos=(EditText)findViewById(R.id.hilos);
+        txtTotalPrueba=(EditText)findViewById(R.id.tiempo_prueba);
+        txtPerEnvio=(EditText)findViewById(R.id.tiempo_envío);
+
+        txtIP =(EditText)findViewById(R.id.txtIP);
+        txtPuerto=(EditText)findViewById(R.id.txtPuerto);
+        txtIP.setText(direccionIP);
+        txtPuerto.setText(""+puerto);
+
+        traficoTCP=(Switch)findViewById(R.id.btnTCP);
+        traficoTCP.setOnCheckedChangeListener(this);
+        traficoUDP=(Switch) findViewById(R.id.btnUDP);
+        traficoUDP.setOnCheckedChangeListener(this);
     }
 
-    @Override
-    public void onCheckedChanged(CompoundButton buttonView, boolean isChecked)
-    {
-        AlertDialog alertDialog = new AlertDialog.Builder(this).create();
-        if (buttonView == traficoTCP) {
-            if (isChecked) {
-                iniciarEnvioTCP(direccionIP, puerto);
-                alertDialog.setTitle("Envío de datos");
-                alertDialog.setMessage("Se ha iniciado el envío de datos a través de protocolo TCP");
-                alertDialog.show();
-            } else {
-                detenerEnvioTCD();
-                double tiempo = (horaFinal - horaInicio) / 1000;
-                int total = (cantidadEnviado + cantidadErrores);
-                double porc = total != 0 ? cantidadErrores * 100 / total : 0;
-                String msj = "Envío de datos protocolo TCP \nEnviados:" + cantidadEnviado + "\nErrores:" + cantidadErrores + "\nTotal:" + total + "\nTiempo:" + tiempo + "s\n%Error:" + porc;
-                alertDialog.setTitle("Estadísticas TCP");
-                alertDialog.setMessage(msj);
-                alertDialog.show();
-            }
-        }
-        else if(buttonView== traficoUDP)
-        {
-            if(isChecked)
-            {
-                iniciarEnvioUDP(direccionIP,puerto);
-                alertDialog.setTitle("Envío de datos");
-                alertDialog.setMessage("Se ha iniciado el envío de datos a través de protocolo UDP");
-                alertDialog.show();
-            }
-            else
-            {
-                detenerEnvioUPD();
-                double tiempo = (horaFinal-horaInicio)/1000;
-                int total=(cantidadPosiciones);
-                double porc = total!=0?cantidadErrores*100/total:0;
-                String msj="Envío de datos protocolo UDP \nIntentados:"+cantidadPosiciones+"\nEnviados:"+cantidadEnviado+"\nErrores:"+cantidadErrores+"\nTotal:"+total+"\nTiempo:"+tiempo+"s\n%Error:"+porc;
-                alertDialog.setTitle("Estadísticas");
-                alertDialog.setMessage(msj);
-                alertDialog.show();
-            }
-        }
 
-
-    }
 }

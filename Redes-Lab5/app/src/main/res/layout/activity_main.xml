@@ -55,6 +55,7 @@
             android:layout_row="1"
             android:layout_column="1"
             android:layout_marginLeft="-165dp" />
+
         <!--Button
             android:layout_width="260dp"
             android:layout_height="wrap_content"
@@ -158,5 +159,63 @@
         android:text="T 200"
         android:id="@+id/t_200"
         android:layout_below="@+id/btnTCP" />
+
+    <EditText
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:inputType="numberDecimal"
+        android:ems="10"
+        android:id="@+id/hilos"
+        android:layout_alignParentTop="true"
+        android:text="hilos"
+        android:layout_alignParentStart="false"
+        android:layout_marginTop="350dp"
+        android:layout_alignRight="@+id/t_200"
+        android:maxLength="3" />
+
+    <EditText
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:inputType="number"
+        android:ems="10"
+        android:id="@+id/tiempo_prueba"
+        android:layout_alignParentTop="true"
+        android:layout_toEndOf="@+id/hilos"
+        android:text="prueba"
+        android:layout_marginTop="350dp"
+        android:layout_alignRight="@+id/t_300"
+        android:maxLength="2" />
+
+    <EditText
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:inputType="number"
+        android:ems="10"
+        android:id="@+id/tiempo_envío"
+        android:layout_row="2"
+        android:layout_column="0"
+        android:layout_marginTop="350dp"
+        android:layout_toRightOf="@+id/t_300"
+        android:text="envío"
+        android:autoText="false"
+        android:maxLength="3" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="UDP"
+        android:id="@+id/udp_test"
+        android:layout_alignParentTop="true"
+        android:layout_toEndOf="@+id/t_100"
+        android:layout_marginTop="400dp" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="TCP"
+        android:id="@+id/tcp_test"
+        android:layout_alignParentTop="true"
+        android:layout_alignStart="@+id/t_300"
+        android:layout_marginTop="400dp" />
 
 </RelativeLayout>

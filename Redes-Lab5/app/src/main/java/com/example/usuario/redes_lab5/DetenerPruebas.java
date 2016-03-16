@@ -10,6 +10,7 @@ public class DetenerPruebas  implements Runnable
     public final static boolean TCP = false;
     MainActivity principal;
     boolean tipo_prueba;
+
     public DetenerPruebas(int n, boolean tipo, MainActivity pal)
     {
         tiempo = n;
