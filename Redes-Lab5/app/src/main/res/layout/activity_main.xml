@@ -184,7 +184,7 @@
         android:text="prueba"
         android:layout_marginTop="350dp"
         android:layout_alignRight="@+id/t_300"
-        android:maxLength="2" />
+        android:maxLength="3" />
 
     <EditText
         android:layout_width="wrap_content"
